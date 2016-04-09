@@ -85,6 +85,182 @@ function compileShader(gl, type, code){
   return shaderID;
 }
 
+class Mesh{
+  constructor(){
+    this.vertices = [];
+    this.normals  = [];
+    this.colors   = [];
+    this.position = [];
+    this.orientation = [];
+    this.modelMatrix = Array(16);
+  }
+  computeModelMatrix(){
+    var m = this.modelMatrix;
+    var p = this.position;
+    var o = this.orientation;
+
+    var cosX = Math.cos(o[0]);
+    var cosY = Math.cos(o[1]);
+    var cosZ = Math.cos(o[2]);
+
+    var sinX = Math.sin(o[0]);
+    var sinY = Math.sin(o[1]);
+    var sinZ = Math.sin(o[2]);
+
+    // Do m[0] ao m[11], estamos convertendo os ângulos de Euler para
+    // uma matriz de Rotação
+    m[0 ]  = cosY*cosZ;                   
+    m[1 ]  = cosY * sinZ;
+    m[2 ]  = -sinY;
+    m[3 ]  = 1;
+
+    m[4 ]  = sinX*sinY*cosZ - cosX*sinZ;  
+    m[5 ]  = sinX*sinY*sinZ + cosX*cosZ;
+    m[6 ]  = sinX*cosY;
+    m[7 ]  = 1;
+
+    m[8 ]  = cosX*sinY*cosZ + sinX*sinZ;
+    m[9 ]  = cosX*sinY*sinZ - sinX*cosZ;
+    m[10]  = cosX*cosY;
+    m[11]  = 1;
+    // A origem será a posição do objeto
+    m[12]  = p[0]; m[13] = p[1]; m[14] = p[2] ; m[15] = 1;
+  }
+}
+class Scene{
+  constructor(){
+    this.objects = [];
+    this.materials = [];
+  }
+}
+
+class Renderer{
+  constructor(){
+    this.program = null;
+  }
+  createShader(vertexFile, programFile){
+      compileShader()
+  }
+}
+
+class Camera{
+  constructor(){
+    this.right   = new Float32Array(3);
+    this.forward = new Float32Array(3);
+    this.up      = new Float32Array(3);
+    this.origin  = new Float32Array(3);
+
+    this.viewMatrix       = new Float32Array(16);
+    this.projectionMatrix = new Float32Array(16);
+  }
+  resetViewMatrix(){
+    var r = this.right, f = this.forward, u = this.up;
+    r[0] = 1; r[1] = 0; r[2] = 0;
+    f[0] = 0; f[1] = 1; f[2] = 0;
+    u[0] = 0; u[1] = 0; u[2] = 1;
+
+    updateViewMatrix();
+  }
+  updateViewMatrix(){
+    var v = this.viewMatrix, o = this.origin;
+    var r = this.right, f = this.forward, u = this.up;
+
+    v[0 ] = r[0]; v[1 ] = r[1]; v[2 ] = r[2]; v[3 ] = 0;
+    v[4 ] = f[0]; v[5 ] = f[1]; v[6 ] = f[2]; v[7 ] = 0;
+    v[8 ] = u[0]; v[9 ] = u[1]; v[10] = u[2]; v[11] = 0;
+    v[12] = o[0]; v[13] = o[1]; v[14] = o[2]; v[15] = 1;
+  }
+  moveRight(units){
+    var o = this.origin, r = this.right;
+    o[0] += r[0]*units;
+    o[1] += r[1]*units;
+    o[2] += r[2]*units;
+  }
+  moveLeft(units){
+    this.moveRight(-units);
+  }
+  moveForward(units){
+    var o = this.origin, f = this.forward;
+    o[0] += f[0]*units;
+    o[1] += f[1]*units;
+    o[2] += f[2]*units;
+  }
+  moveBackwards(units){
+    this.moveForward(-units);
+  }
+  
+}
+class PerspectiveCamera{
+  constructor(){
+    this.fov    = null;
+    this.aspect = null;
+    this.near   = null;
+    this.far    = null;
+  }
+  makePerspective(fov, aspect, near, far){
+    this.fov    = fov;
+    this.aspect = aspect;
+    this.near   = near;
+    this.far    = far;
+
+    var zoom     = 1;
+    var new_fov  = radToDeg(2 * Math.atan(Math.tan(degToRad(fov) * 0.5)/zoom));
+    var ymax     = near * Math.tan(degToRad(new_fov * 0.5));
+    var ymin     = - ymax;
+    var xmin     = ymin * aspect;
+    var xmax     = ymax * aspect;
+    return this.frustrum(xmin, xmax, ymin, ymax, near, far);
+  }
+  frustrum(left, right, bottom, top, near, far){
+    var te = this.projectionMatrix;
+    var x = 2 * near / ( right - left );
+    var y = 2 * near / ( top - bottom );
+
+    var a = ( right + left ) / ( right - left );
+    var b = ( top + bottom ) / ( top - bottom );
+    var c = - ( far + near ) / ( far - near );
+    var d = - 2 * far * near / ( far - near );
+
+    te[ 0 ] = x;  te[ 4 ] = 0;  te[ 8 ] = a;  te[ 12 ] = 0;
+    te[ 1 ] = 0;  te[ 5 ] = y;  te[ 9 ] = b;  te[ 13 ] = 0;
+    te[ 2 ] = 0;  te[ 6 ] = 0;  te[ 10 ] = c; te[ 14 ] = d;
+    te[ 3 ] = 0;  te[ 7 ] = 0;  te[ 11 ] = - 1; te[ 15 ] = 0;
+    return te;
+  }
+}
+class OrthographicCamera{
+  constructor(){
+    this.left   = null;
+    this.right  = null;
+    this.bottom = null;
+    this.top    = null;
+    this.near   = null;
+    this.far    = null;
+  }
+  makeOrthographic(left, right, bottom, top, near, far){
+
+  }
+}
+
+class Light{
+  constructor(){
+    this.ambient_color = null;
+    this.diffuse_color = null;
+    this.specular_color= null;
+    this.power         = null;
+  }
+}
+class PointLight extends Light{
+  constructor(){
+    this.position      = null;
+  }
+}
+class DirectionalLight extends Light{
+  constructor(){
+    this.direction     = null;
+  }
+}
+
 /**
  * @brief: combina dois shaders e cria um programa a ser usado na GPU
  * 
