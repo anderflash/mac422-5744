@@ -114,6 +114,38 @@ function compileProgram(gl, vertexShaderID, fragmentShaderID){
   return programID;
 }
 
+function degToRad(number){
+  return number/180.0*Math.PI;
+}
+function radToDeg(number){
+  return number/Math.PI*180.0;
+}
+function perspective(fov, aspect, near, far){
+    var zoom = 1;
+    var new_fov  = radToDeg(2 * Math.atan(Math.tan(degToRad(fov) * 0.5)/zoom));
+    var ymax     = near * Math.tan(degToRad(new_fov * 0.5));
+    var ymin     = - ymax;
+    var xmin     = ymin * aspect;
+    var xmax     = ymax * aspect;
+    return frustrum(xmin, xmax, ymin, ymax, near, far);
+  }
+function frustrum(left, right, bottom, top, near, far){
+    var te = Array(16);
+    var x = 2 * near / ( right - left );
+    var y = 2 * near / ( top - bottom );
+
+    var a = ( right + left ) / ( right - left );
+    var b = ( top + bottom ) / ( top - bottom );
+    var c = - ( far + near ) / ( far - near );
+    var d = - 2 * far * near / ( far - near );
+
+    te[ 0 ] = x;  te[ 4 ] = 0;  te[ 8 ] = a;  te[ 12 ] = 0;
+    te[ 1 ] = 0;  te[ 5 ] = y;  te[ 9 ] = b;  te[ 13 ] = 0;
+    te[ 2 ] = 0;  te[ 6 ] = 0;  te[ 10 ] = c; te[ 14 ] = d;
+    te[ 3 ] = 0;  te[ 7 ] = 0;  te[ 11 ] = - 1; te[ 15 ] = 0;
+    return te;
+  }
+
 /**
  * @brief: gera uma matriz identidade 4x4 (uma lista de 16 números reais)
  * 
