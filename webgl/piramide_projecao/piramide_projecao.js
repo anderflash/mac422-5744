@@ -26,51 +26,6 @@
  * dade de São Paulo
  */
 
-var canvas;                  // referência ao <canvas> do HTML
-var gl;                      // contexto WebGL (estado do sistema e funções)
-
-var vertexShaderSrc;         // Código do nosso shader de vértice
-var fragmentShaderSrc;       // Código do nosso shader de fragmento
-var vertexShaderID;          // Ao compilar o código, o WebGL retorna o ID
-var fragmentShaderID;        // Ao compilar o código, o WebGL retorna o ID
-var programShaderID;         // Combina vertex e frag shaders. Cada programa
-                             // oferece um efeito específico. Um ambiente pode
-                             // gerar efeitos diferentes trocando os programas
-                             // no momento certo
-
-var modelMatrix;             // Lista de 16 elementos (4x4) para posicionar e
-                             // orientar nosso objeto ao mundo (cada objeto
-                             // terá um modelMatrix diferente) 
-var viewMatrix;              // Lista de 16 elementos (4x4) para posicionar e 
-                             // orientar nosso mundo à camera (parâmetros 
-                             // extrínsecos). Cada câmera terá um viewMatrix
-                             // diferente.
-var projectionMatrix;        // Achatar o mundo todo no plano da imagem (seja 
-                             // por perspectiva, por ortográfica, paraperspec-
-                             // tiva...). Parâmetros intrínsecos da câmera.
-
-
-var modelMatrixUniform;      // As listas supracitadas estão na CPU. O shader
-var viewMatrixUniform;       // utiliza as uniforms (buffer de dados comparti-
-                             // lhados ao vértices) da GPU. Precisamos enviar
-var projectionMatrixUniform; // as matrizes para esses uniforms.
-
-
-var trianglePos;             // Lista de dados do atributo "posição" do objeto
-var triangleCol;             // Lista de dados do atributo "cor" do objeto
-
-var trianglePosBuffer;       // Igual às matrizes: o vertexShader utiliza o que
-                             // estiver na GPU. Este será o ID do buffer da GPU
-                             // que usaremos para enviar a lista de posições de
-                             // vértices do obj.
-var triangleColBuffer;       // ID do buffer para as cores dos vértices do obj.
-
-var vertexPosAttrib;         // Referência ao atributo de posição no shader 
-                             // (vamos usar isso para associá-la ao buffer de
-                             // posições)
-var vertexColAttrib;         // Referência ao atributo de cor no shader (vamos
-                             // usar isso para associá-la ao buffer de cores)
-
 var speed = 0.5;             // Parâmetro para controlar a animação
 var lastTime = 0;            // Quero usar a duração do frame para controlar a
                              // animação (evitando que a animação em um 
@@ -78,6 +33,10 @@ var lastTime = 0;            // Quero usar a duração do frame para controlar a
                              // um computador mais fraco). O lastTime guarda
                              // o momento (em milisegundos) do último frame
                              // desenhado.
+var program = null;
+var scene   = null;
+var renderer= null;
+var camera  = null;
 
 /**
  * @brief: Primeiro passo. Obter o canvas e criar o contexto WebGL  
@@ -91,60 +50,9 @@ var lastTime = 0;            // Quero usar a duração do frame para controlar a
  * @method     iniciarWebGL
  */
 function iniciarWebGL(){
-  // Obter o canvas
-  canvas = document.getElementById("meucanvas");
-  if(!canvas){
-    console.error("Canvas não obtido");
-  }
-
-  // Criar o contexto WebGL
-  gl = canvas.getContext("webgl")|| canvas.getContext("experimental-webgl");
-  
-  // Compilar os shaders
-  vertexShaderSrc = `
-
-    precision mediump float;
-    
-    attribute vec3 vertex_pos;
-    attribute vec3 vertex_col;
-
-    varying vec3 color;
-
-    uniform mat4 P;
-    uniform mat4 V;
-    uniform mat4 M;
-
-    void main(){
-      gl_Position = P * V * M * vec4(vertex_pos, 1.0);
-      color = vertex_col;
-
-    }
-
-  `;
-  fragmentShaderSrc = `
-    precision mediump float;
-    varying vec3 color;
-    void main(){
-      gl_FragColor = vec4(color, 1.0);
-    }
-  `;
-
-  // Criando os shaders e os programas
-  vertexShaderID = compileShader(gl,gl.VERTEX_SHADER, vertexShaderSrc);
-  fragmentShaderID = compileShader(gl,gl.FRAGMENT_SHADER, fragmentShaderSrc);
-  programShaderID = compileProgram(gl,vertexShaderID, fragmentShaderID);
-  gl.useProgram(programShaderID);
-
-  // Obtendo as referências nos shaders
-  modelMatrixUniform = gl.getUniformLocation(programShaderID, "M");
-  viewMatrixUniform = gl.getUniformLocation(programShaderID, "V");
-  projectionMatrixUniform = gl.getUniformLocation(programShaderID, "P");
-  vertexPosAttrib = gl.getAttribLocation(programShaderID,"vertex_pos");
-  vertexColAttrib = gl.getAttribLocation(programShaderID,"vertex_col");
-
-  // Informar ao WebGL que iremos utilizar os atributos
-  gl.enableVertexAttribArray(vertexPosAttrib);
-  gl.enableVertexAttribArray(vertexColAttrib);
+  renderer = new Renderer();
+  renderer.init("meucanvas");
+  return renderer.createProgram("vertex.glsl","frag.glsl",["M","V","P","color"],["vertex_pos", "vertex_normal"]);
 }
 
 /**
@@ -160,50 +68,9 @@ function iniciarWebGL(){
  * @method     criarCena
  */
 function criarCena(){
-  // Preencher os atributos (ex: posição e cor) do nosso objeto na CPU
-  trianglePos = [
-    -1.0, 0.0, 0.0,
-     1.0, 0.0, 0.0,
-     0.0, 1.0, 0.0
-  ];
-
-  triangleCol = [
-     1.0, 0.0, 0.0,
-     0.0, 1.0, 0.0,
-     0.0, 0.0, 1.0
-  ];
-  gl.clearColor(0, 0, 0.5, 1);
-
-  // POSIÇÃO: Criar os espaços de memória na GPU
-  trianglePosBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, trianglePosBuffer);
-
-  // POSIÇÃO: Enviar as listas da CPU para os buffers da GPU
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(trianglePos), gl.STATIC_DRAW);
-
-  // POSIÇÃO: Informar o tamanho do atributo para cada vértice
-  gl.vertexAttribPointer(vertexPosAttrib, 3, gl.FLOAT, false, 0, 0);
-
-  // COR: Criar os espaços de memória na GPU
-  triangleColBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, triangleColBuffer);
-
-  // COR: Enviar as listas da CPU para os buffers da GPU
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleCol), gl.STATIC_DRAW);
-
-  // COR: Informar o tamanho do atributo para cada vértice
-  gl.vertexAttribPointer(vertexColAttrib, 3, gl.FLOAT, false, 0, 0);
-
-  // Preencher as matrizes na CPU
-  modelMatrix = eye();
-  translate(modelMatrix, [0.2, 0.0, 0.0]);
-  viewMatrix = eye();
-  projectionMatrix = eye();
-
-  // Enviar as matrizes para a GPU
-  gl.uniformMatrix4fv(modelMatrixUniform, false, modelMatrix);
-  gl.uniformMatrix4fv(viewMatrixUniform, false, viewMatrix);
-  gl.uniformMatrix4fv(projectionMatrixUniform, false, projectionMatrix);
+  scene  = new Scene(renderer.gl);
+  camera = new Camera();
+  return scene.createObjectByFile('../cube.obj');
 }
 
 /**
@@ -216,11 +83,8 @@ function criarCena(){
  */
 function desenharCena(){
   // Limpar a tela e as profundidades
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  // Desenhar os objetos informando o vértice inicial e o número
-  // de vértices
-  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  renderer.clear();
+  renderer.render(scene, camera);
 }
 
 /**
@@ -233,15 +97,9 @@ function desenharCena(){
  * @method     tick
  */
 function tick(){
-  // Usar o programa
-  gl.useProgram(programShaderID);
-
   requestAnimFrame(tick);
   desenharCena();
   animar();
-
-  // Boas práticas: resetar o estado
-  gl.useProgram(null);
 }
 
 /**
@@ -258,8 +116,8 @@ function animar(){
   var now = new Date().getTime();
   if(lastTime != 0){
     var duration = (now - lastTime)/1000.0;
-    translate(modelMatrix, [speed * duration, 0, 0]);
-    gl.uniformMatrix4fv(modelMatrixUniform, false, modelMatrix);
+    //translate(modelMatrix, [speed * duration, 0, 0]);
+    //gl.uniformMatrix4fv(modelMatrixUniform, false, modelMatrix);
   }
   lastTime = now;
 }
@@ -269,9 +127,9 @@ function animar(){
 // carregado!)
 document.addEventListener("DOMContentLoaded", function(e){
   // Primeiro passo: canvas, contexto e shaders
-  iniciarWebGL();
+  iniciarWebGL().
   // Segundo passo: posições, cores, buffers, matrizes e uniforms
-  criarCena();
+  then(criarCena).
   // Terceiro passo: desenhar e já agendar o próximo redesenho
-  tick();
+  then(tick);
 });

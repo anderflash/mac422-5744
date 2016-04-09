@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf8">
+  <title></title>
+</head>
+<body>
+<script type="text/javascript" src="at3dutils.js"></script>
+<script type="text/javascript" src="material.js"></script>
+<script type="text/javascript">
+  var colormaterial = new ColorMaterial();
+  colormaterial.name               = "Ruby";
+  colormaterial.shininess          = 0.5;
+  colormaterial.refraction_index   = 0.1;
+  colormaterial.transparency       = 0.8;
+  colormaterial.illumination_model = 0;
+  colormaterial.ambient  = [0.0, 0.3, 0.4];
+  colormaterial.diffuse  = [0.0, 0.3, 0.4];
+  colormaterial.specular = [1.0, 1.0, 1.0];
+  colormaterial.emissive = null;
+
+  var imagematerial = new ImageMaterial();
+  imagematerial.name               = "Ruby";
+  imagematerial.shininess          = 0.5;
+  imagematerial.refraction_index   = 0.1;
+  imagematerial.transparency       = 0.8;
+  imagematerial.illumination_model = 0;
+  imagematerial.ambient_map = "";
+  imagematerial.suss = "";
+  imagematerial.dasfas = "";
+
+  var text = `
+   newmtl Textured
+   Ka 1.000 1.000 1.000
+   Kd 1.000 1.000 1.000
+   Ks 0.000 0.000 0.000
+   d 1.0
+   illum 2
+   map_Ka lenna.tga           # the ambient texture map
+   map_Kd lenna.tga           # the diffuse texture map (most of the time, it will
+                              # be the same as the ambient texture map)
+   map_Ks lenna.tga           # specular color texture map
+   map_Ns lenna_spec.tga      # specular highlight component
+   map_d lenna_alpha.tga      # the alpha texture map
+   map_bump lenna_bump.tga    # some implementations use 'map_bump' instead of 'bump' below
+  `;
+  materials = getMaterialsFromMTLText(text);
+  console.log(materials);
+
+  getMaterialsFromMTLFile("cube.mtl").then(function(materials){
+    console.log(materials);
+  });
+</script>
+</body>
+</html>
