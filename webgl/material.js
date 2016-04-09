@@ -185,6 +185,26 @@ function getMaterialsFromMTLText(data){
   return materials;
 }
 
+/**
+ * Get the materials from mtl file.
+ *
+ * @method     getMaterialsFromMTLFile
+ * @param      {<type>}  filename  { description }
+ * @return     {<type>}  { description_of_the_return_value }
+ */
 function getMaterialsFromMTLFile(filename){
   return get(filename).then(getMaterialsFromMTLText).catch(logError);
+}
+
+/**
+ * Return a material from a list by name
+ *
+ * @method     getMaterialByName
+ * @param      {Array}    materials  { Lista de materiais }
+ * @param      {String}   name       { Nome do material a ser procurado }
+ * @return     {Material} { Um material com o nome enviado }
+ */
+function getMaterialByName(materials, name){
+  for(let material of materials)
+    if(material.name == name) return material;
 }

@@ -27,12 +27,9 @@
 /**
  * @brief Classe para estruturar a cena
  */
- class Scene{
-  constructor(gl){
-    this.gl                 = gl;
-    this.objects            = null;
-    this.objectBuffers      = [];
-    this.materials          = null;
+ class Scene extends Container3D{
+  constructor(){
+    
   }
   createObjectByFile(filename){
     var scene = this;

@@ -26,8 +26,13 @@
 
 class Object3D{
   constructor(){
-    this.name = null;
+    this.name     = null;
+    this._changed  = false;
   }
+  set changed(value){
+    this._changed = value;
+  }
+  get changed(){return this._changed;}
 }
 
 /**
@@ -35,19 +40,73 @@ class Object3D{
  */
 class Mesh3D extends Object3D{
   constructor(){
-    this.vertices           = [];
-    this.normals            = [];
-    this.texcoords          = [];
-    this.indices            = [];
-    this.material           = null;
+    super();
+    this._vertices           = [];
+    this._normals            = [];
+    this._texcoords          = [];
+    this._indices            = [];
+    this._material           = null;
   }
+
+  // Acessores e mutatores
+  set vertices (list) { this._vertices  = list; this._changed = true;}
+  set normals  (list) { this._normals   = list; this._changed = true;}
+  set texcoords(list) { this._texcoords = list; this._changed = true;}
+  set indices  (list) { this._indices   = list; this._changed = true;}
+  
+  get vertices (){return this._vertices;  }
+  get normals  (){return this._normals;   }
+  get texcoords(){return this._texcoords; }
+  get indices  (){return this._indices;   }
+  
+  /**
+   * Converter tupla de 3 índices em índice único
+   *
+   * @method     pack_indices
+   */
   pack_indices(){
-    
+    var indices2    = [];
+    var vertices2   = [];
+    var normals2    = [];
+    var texcoords2  = [];
+    var object      = {};
+    var vertex_str;
+    var index = 0;
+    for(let face of this.indices){
+      for(let vertex of face){
+        vertex_str = vertex.join('/');
+        if(object.hasOwnProperty(vertex_str)){
+          indices2.push(object[vertex_str]);
+        }else{
+          object[vertex_str] = index;
+          indices2.push(index);
+          if(!isNaN(vertex[0])) vertices2.push (this.vertices[vertex[0]]);
+          if(!isNaN(vertex[1])) normals2.push  (this.normals[vertex[1]]);
+          if(!isNaN(vertex[2])) texcoords2.push(this.texcoords[vertex[2]]);
+          index++;
+        }
+      }
+    }
+    this.vertices  = vertices2;
+    this.normals   = normals2;
+    this.texcoords = texcoords2;
+    this.indices2  = indices2;
+
+    this.changed   = true;
+    this.dispatchEvent(new Event("changed"));
   }
+
 }
 
+/**
+ * Coleção de objetos (que podem ser containers), criando uma árvore,
+ * um grafo de cena
+ *
+ * @class
+ */
 class Container3D extends Object3D{
   constructor(){
+    super();
     this.objects = [];
   }
   addObject(object){
@@ -68,6 +127,7 @@ class Container3D extends Object3D{
   }
   removeObject(object){
     this.objects.removeChild(object);
+    this.changed = true;
   }
 }
 
@@ -100,11 +160,12 @@ function readOBJ(filename){
  *                          e de objetos) }
  */
 function parseOBJ(data, base_path){
-  var objects    = [];
+  var container    = new Container3D();
   var materials  = null;
   var cur_object = null;
   var lines      = data.split('\n');
   var materialPromise = null;
+  var face;
 
   // Processar cada linha
   for(let line of lines){
@@ -112,7 +173,7 @@ function parseOBJ(data, base_path){
     
     // Carregar os materiais
     if(tokens[0] == "mtllib"){
-      materialPromise = readOBJMaterial([base_path,tokens[1]].join('/'));
+      materialPromise = getMaterialsFromMTLFile([base_path,tokens[1]].join('/'));
       break;
     }
   }
@@ -122,9 +183,9 @@ function parseOBJ(data, base_path){
       var tokens = line.split(' ');
       switch(tokens[0]){
         case "o":  // Novo objeto/
-          cur_object      = new Object3D();
+          cur_object      = new Mesh3D();
           cur_object.name = tokens[1];
-          objects.push(cur_object);
+          container.addObject(cur_object);
           break;
         case "v":  // Novo vértice
           cur_object.vertices.push(tokens.slice(1).map(parseFloat));
@@ -136,6 +197,9 @@ function parseOBJ(data, base_path){
           cur_object.texcoords.push(tokens.slice(1).map(parseFloat));
         break;
         case "f":  // Face
+          face = tokens.slice(1).map(item => item.split('/'))
+                    .map(item => item.map(element => parseFloat(element)));
+          cur_object.indices.push(face);
         break;
         case "s":  // Sombra
         break;
@@ -145,9 +209,9 @@ function parseOBJ(data, base_path){
       }
     }
 
-    for(let object of objects)
+    for(let object of container.objects)
       object.pack_indices();
 
-    return [mat,objects];
+    return [mat,container];
   });
 }

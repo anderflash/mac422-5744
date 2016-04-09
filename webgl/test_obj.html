@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="utf8">
   <title></title>
 </head>
 <body>
@@ -9,26 +10,34 @@
 <script type="text/javascript" src="object.js"></script>
 <script type="text/javascript">
   var mesh = new Mesh3D();
-  mesh.vertices = [1.0, 0.0, 0.0,
-                   0.0, 1.0, 0.0,
+  mesh.vertices = [0.0, 0.0, 0.0,
+                   1.0, 0.0, 0.0,
                    0.0, 0.0, 1.0,
-                   0.0, 0.0, 0.0,
+                   1.0, 0.0, 1.0,
+                   0.0, 1.0, 0.0,
                    1.0, 1.0, 0.0,
                    0.0, 1.0, 1.0,
-                   1.0, 0.0, 1.0,
                    1.0, 1.0, 1.0];
-  mesh.normals  = [1.0, 0.0,
-                   0.0, 1.0,
-                   0.0, 0.0,
-                   0.0, 0.0,
-                   0.0, 0.0,
-                   0.0, 0.0,
-                   0.0, 0.0,
-                   0.0, 0.0,
-                   0.0, 0.0];
-  mesh.uvs      = [
-  ];
+  mesh.normals  = [1.0, 0.0, 0.0,
+                   0.0, 1.0, 0.0,
+                   0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0,
+                   0.0, 0.0, 0.0];
+  mesh.indices  [[4,0,4],[0,0,0],
+                 [5,0,5],[1,0,1],
+                 [6,0,6],[2,0,2],
+                 [7,0,7],[3,0,3]];
+  var container = new Container3D();
+  container.addObject(mesh);
+  console.log(container.objects);
 
+  readOBJ("cube.obj").then(function(objects){
+    console.log(objects);
+  });
 </script>
 </body>
 </html>
