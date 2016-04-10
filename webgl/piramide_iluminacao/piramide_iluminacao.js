@@ -26,65 +26,7 @@
  * dade de São Paulo
  */
 
-var canvas;                  // referência ao <canvas> do HTML
-var gl;                      // contexto WebGL (estado do sistema e funções)
-
-var vertexShaderSrc;         // Código do nosso shader de vértice
-var fragmentShaderSrc;       // Código do nosso shader de fragmento
-var vertexShaderID;          // Ao compilar o código, o WebGL retorna o ID
-var fragmentShaderID;        // Ao compilar o código, o WebGL retorna o ID
-var programShaderID;         // Combina vertex e frag shaders. Cada programa
-                             // oferece um efeito específico. Um ambiente pode
-                             // gerar efeitos diferentes trocando os programas
-                             // no momento certo
-
-var modelMatrix;             // Lista de 16 elementos (4x4) para posicionar e
-                             // orientar nosso objeto ao mundo (cada objeto
-                             // terá um modelMatrix diferente) 
-var viewMatrix;              // Lista de 16 elementos (4x4) para posicionar e 
-                             // orientar nosso mundo à camera (parâmetros 
-                             // extrínsecos). Cada câmera terá um viewMatrix
-                             // diferente.
-var projectionMatrix;        // Achatar o mundo todo no plano da imagem (seja 
-                             // por perspectiva, por ortográfica, paraperspec-
-                             // tiva...). Parâmetros intrínsecos da câmera.
-
-
-var modelMatrixUniform;      // As listas supracitadas estão na CPU. O shader
-var viewMatrixUniform;       // utiliza as uniforms (buffer de dados comparti-
-                             // lhados ao vértices) da GPU. Precisamos enviar
-var projectionMatrixUniform; // as matrizes para esses uniforms.
-
-var light_pos = [-1,0,0];
-var light_posUniform;
-var camera_position = [0.0, 0.0, -1.0];
-var camera_position_uniform;
-
-var pyramidPos;
-var pyramidNormals;
-var pyramidIndices;
-
-
-var pyramidPosBuffer;
-var pyramidNormalsBuffer;
-var pyramidIndicesBuffer;
-
-var trianglePos;             // Lista de dados do atributo "posição" do objeto
-var triangleCol;             // Lista de dados do atributo "cor" do objeto
-
-
-var trianglePosBuffer;       // Igual às matrizes: o vertexShader utiliza o que
-                             // estiver na GPU. Este será o ID do buffer da GPU
-                             // que usaremos para enviar a lista de posições de
-                             // vértices do obj.
-var triangleColBuffer;       // ID do buffer para as cores dos vértices do obj.
-
-var vertexPosAttrib;         // Referência ao atributo de posição no shader 
-                             // (vamos usar isso para associá-la ao buffer de
-                             // posições)
-var vertexNormalAttrib;
-var vertexColAttrib;         // Referência ao atributo de cor no shader (vamos
-                             // usar isso para associá-la ao buffer de cores)
+var pyramid, pyramid2;
 
 var speed = 0.5;             // Parâmetro para controlar a animação
 var lastTime = 0;            // Quero usar a duração do frame para controlar a
@@ -93,6 +35,11 @@ var lastTime = 0;            // Quero usar a duração do frame para controlar a
                              // um computador mais fraco). O lastTime guarda
                              // o momento (em milisegundos) do último frame
                              // desenhado.
+
+var scene;
+var camera;
+var renderer;
+var keys = {};
 
 /**
  * @brief: Primeiro passo. Obter o canvas e criar o contexto WebGL  
@@ -106,84 +53,28 @@ var lastTime = 0;            // Quero usar a duração do frame para controlar a
  * @method     iniciarWebGL
  */
 function iniciarWebGL(){
-  // Obter o canvas
-  canvas = document.getElementById("meucanvas");
-  if(!canvas){
-    console.error("Canvas não obtido");
-  }
+  renderer = new Renderer();
+  renderer.getContext("meucanvas");
 
-  // Criar o contexto WebGL
-  gl = canvas.getContext("webgl")|| canvas.getContext("experimental-webgl");
-  
-  // Compilar os shaders
-  vertexShaderSrc = `
+  // Informando quem é quem nos shaders
+  renderer.uniforms  [UniformType.MATRIX_MODEL]      = "M";
+  renderer.uniforms  [UniformType.MATRIX_VIEW]       = "V";
+  renderer.uniforms  [UniformType.MATRIX_PROJECTION] = "P";
+  renderer.uniforms  [UniformType.LIGHT1_POS]        = "light_pos";
+  renderer.uniforms  [UniformType.LIGHT1_AMBI]       = "light_ambi";
+  renderer.uniforms  [UniformType.LIGHT1_DIFF]       = "light_diff";
+  renderer.uniforms  [UniformType.LIGHT1_SPEC]       = "light_spec";
+  renderer.uniforms  [UniformType.LIGHT1_PWER]       = "light_pwer";
+  renderer.uniforms  [UniformType.CAMERA_POS]        = "camera_pos";
+  // N = transpose(inverse(M*V))
+  // Vetores normais não são influenciados pela translação
+  renderer.uniforms  [UniformType.MATRIX_NORMAL]     = "N";
 
-    precision mediump float;
-    
-    attribute vec3 vertex_pos;
-    attribute vec3 vertex_normal;
+  renderer.attributes[AttribType.POSITION]           = "vertex_pos";
+  renderer.attributes[AttribType.NORMAL]             = "vertex_normal";
+  renderer.background = [0.0, 0.0, 0.4, 1.0];
+  return renderer.createProgram("vertex.glsl","frag.glsl");
 
-    //varying vec3 color;
-
-    uniform mat4 P;
-    uniform mat4 V;
-    uniform mat4 M;
-
-    uniform vec3 light_pos;
-    uniform vec3 camera_pos;
-
-    varying vec3 vertex_pos_transformed;
-    varying vec3 normal;
-
-    void main(){
-      gl_Position = P * V * M * vec4(vertex_pos, 1.0);
-      //color = vertex_col;
-      normal = vertex_normal;
-      vertex_pos_transformed = gl_Position.xyz;
-    }
-
-  `;
-  fragmentShaderSrc = `
-    precision mediump float;
-
-    uniform vec3 light_pos;
-    uniform vec3 camera_pos;
-    varying vec3 normal;
-    varying vec3 vertex_pos_transformed;
-    //varying vec3 color;
-    void main(){
-      vec3 normal_normed = normalize(normal);
-      vec3 light_pos_normed = normalize(vertex_pos_transformed-light_pos);
-      float cosTheta = dot(normal_normed, light_pos_normed);
-      cosTheta = max(min(cosTheta, 1),0);
-      gl_FragColor = vec4(1.0,0.0,0.0, 1.0)*cosTheta;
-    }
-  `;
-
-  // Criando os shaders e os programas
-  vertexShaderID = compileShader(gl,gl.VERTEX_SHADER, vertexShaderSrc);
-  fragmentShaderID = compileShader(gl,gl.FRAGMENT_SHADER, fragmentShaderSrc);
-  programShaderID = compileProgram(gl,vertexShaderID, fragmentShaderID);
-  gl.useProgram(programShaderID);
-
-  // Obtendo as referências nos shaders
-  modelMatrixUniform = gl.getUniformLocation(programShaderID, "M");
-  viewMatrixUniform = gl.getUniformLocation(programShaderID, "V");
-  projectionMatrixUniform = gl.getUniformLocation(programShaderID, "P");
-  vertexPosAttrib    = gl.getAttribLocation(programShaderID,"vertex_pos");
-  vertexNormalAttrib = gl.getAttribLocation(programShaderID,"vertex_normal");
-  vertexColAttrib    = gl.getAttribLocation(programShaderID,"vertex_col");
-  light_posUniform   = gl.getUniformLocation(programShaderID, "light_pos");
-  camera_position_uniform   = gl.getUniformLocation(programShaderID, "camera_pos");
-
-
-  gl.uniform3fv(light_posUniform, light_pos);
-  gl.uniform3fv(camera_position_uniform, camera_position);
-
-  // Informar ao WebGL que iremos utilizar os atributos
-  gl.enableVertexAttribArray(vertexPosAttrib);
-  gl.enableVertexAttribArray(vertexNormalAttrib);
-  //gl.enableVertexAttribArray(vertexColAttrib);
 }
 
 /**
@@ -199,99 +90,74 @@ function iniciarWebGL(){
  * @method     criarCena
  */
 function criarCena(){
-  // Preencher os atributos (ex: posição e cor) do nosso objeto na CPU
-   
-  pyramidPos = [
-    0.0, 0.0, 0.0,
-    1.0, 0.0, 0.0,
-    1.0, 0.0, -1.0,
-    0.0, 0.0, -1.0,
-    0.5, 1.0, -0.5
+  // Criando um novo mesh, uma piramide
+  pyramid       = new Mesh();
+  pyramid.name      = "pyramid";
+  pyramid.vertices  = [
+    -0.5, 0.0,  0.5,
+     0.5, 0.0,  0.5,
+     0.5, 0.0, -0.5,
+    -0.5, 0.0, -0.5,
+     0.0, 1.0,  0
   ];
-
-  pyramidNormals = [
+  pyramid.normals   = [
     -1.0, 0.0,  1.0,
      1.0, 0.0,  1.0,
      1.0, 0.0, -1.0,
     -1.0, 0.0, -1.0,
      0.0, 1.0,  0.0
   ];
-
-  pyramidIndices = [
+  pyramid.indices   = [
     0,1,4,
     1,2,4,
     2,3,4,
     3,0,4,
     0,1,3,
     1,2,3
-  ]; 
-
-
-  trianglePos = [
-     0.0, 0.0, 0.0,
-     
-
-    -1.0, 0.0, 0.0,
-     1.0, 0.0, 0.0,
-     0.0, 1.0, 0.0,
   ];
+  pyramid.changed   = true;
 
-  triangleCol = [
-     1.0, 0.0, 0.0,
-     0.0, 1.0, 0.0,
-     0.0, 0.0, 1.0
-  ];
+  // Criando uma segunda piramide
+  pyramid2      = new Mesh();
+  pyramid2.name     = "pyramid2";
+  pyramid2.vertices = pyramid.vertices.slice(0);
+  pyramid2.normals  = pyramid.normals.slice(0);
+  pyramid2.indices  = pyramid.indices.slice(0);
+  pyramid2.changed  = true;
+  
+  pyramid.translate([-1,0,0]);
+  pyramid2.translate([1,0,0]);
 
+  // Criando uma camera
+  camera = new PerspectiveCamera();
+  camera.resetViewMatrix();
+  camera.lookAt([0.0, 1.0, 5.0],
+                [0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0]);
 
-  gl.clearColor(0, 0, 0.5, 1);
+  camera.makePerspective(45.0, renderer.aspect, 0.1, 100.0);
 
-  pyramidPosBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, pyramidPosBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pyramidPos), gl.STATIC_DRAW);
-  gl.vertexAttribPointer(vertexPosAttrib, 3, gl.FLOAT, false, 0, 0);
+  light = new PointLight();
+  light.position       = [1.0, 1.0,-5.0];
+  light.ambient_color  = [1.0, 1.0, 1.0];
+  light.diffuse_color  = [1.0, 1.0, 1.0];
+  light.specular_color = [1.0, 1.0, 1.0];
+  light.power          = 100.0;
 
-  pyramidNormalsBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, pyramidNormalsBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(pyramidNormals), gl.STATIC_DRAW);
-  gl.vertexAttribPointer(vertexNormalAttrib, 3, gl.FLOAT, false, 0, 0);
+  scene = new Scene();
+  scene.addObject(pyramid);
+  scene.addObject(pyramid2);
+  scene.addLight(light);
 
-  pyramidIndicesBuffer = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pyramidIndicesBuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(pyramidIndices), gl.STATIC_DRAW);
-
-
-
-  // POSIÇÃO: Criar os espaços de memória na GPU
-  // trianglePosBuffer = gl.createBuffer();
-  // gl.bindBuffer(gl.ARRAY_BUFFER, trianglePosBuffer);
-
-  // // POSIÇÃO: Enviar as listas da CPU para os buffers da GPU
-  // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(trianglePos), gl.STATIC_DRAW);
-
-  // // POSIÇÃO: Informar o tamanho do atributo para cada vértice
-  // gl.vertexAttribPointer(vertexPosAttrib, 3, gl.FLOAT, false, 0, 0);
-
-  // // COR: Criar os espaços de memória na GPU
-  // triangleColBuffer = gl.createBuffer();
-  // gl.bindBuffer(gl.ARRAY_BUFFER, triangleColBuffer);
-
-  // // COR: Enviar as listas da CPU para os buffers da GPU
-  // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(triangleCol), gl.STATIC_DRAW);
-
-  // // COR: Informar o tamanho do atributo para cada vértice
-  // gl.vertexAttribPointer(vertexColAttrib, 3, gl.FLOAT, false, 0, 0);
-
-  // Preencher as matrizes na CPU
-  modelMatrix = eye();
-  translate(modelMatrix, [-0.5, 0.0, 0.0]);
-  viewMatrix = eye();
-  translate(viewMatrix, camera_position);
-  projectionMatrix = perspective(45.0, canvas.width/canvas.height, 0.1, 100.0);
-
-  // Enviar as matrizes para a GPU
-  gl.uniformMatrix4fv(modelMatrixUniform, false, modelMatrix);
-  gl.uniformMatrix4fv(viewMatrixUniform, false, viewMatrix);
-  gl.uniformMatrix4fv(projectionMatrixUniform, false, projectionMatrix);
+  document.addEventListener("keydown", function(event){
+    keys[event.keyCode] = true;
+    console.log(event.keyCode);
+    event.preventDefault();
+  });
+  document.addEventListener("keyup", function(event){
+    keys[event.keyCode] = false;
+    event.preventDefault();
+  });
 }
 
 /**
@@ -303,14 +169,8 @@ function criarCena(){
  * @method     desenharCena
  */
 function desenharCena(){
-  // Limpar a tela e as profundidades
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-  // Desenhar os objetos informando o vértice inicial e o número
-  // de vértices
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, pyramidIndicesBuffer);
-  gl.drawElements(gl.TRIANGLES, 18, gl.UNSIGNED_SHORT, 0);
-  //gl.drawArrays(gl.TRIANGLES, 0, 3);
+  renderer.clear();
+  renderer.render(scene, camera);
 }
 
 /**
@@ -323,15 +183,9 @@ function desenharCena(){
  * @method     tick
  */
 function tick(){
-  // Usar o programa
-  gl.useProgram(programShaderID);
-
   requestAnimFrame(tick);
   desenharCena();
   animar();
-
-  // Boas práticas: resetar o estado
-  gl.useProgram(null);
 }
 
 /**
@@ -348,8 +202,21 @@ function animar(){
   var now = new Date().getTime();
   if(lastTime != 0){
     var duration = (now - lastTime)/1000.0;
-    translate(modelMatrix, [speed * duration, 0, 0]);
-    gl.uniformMatrix4fv(modelMatrixUniform, false, modelMatrix);
+    
+    camera.changed = true;
+    if(keys[KeyType.UP]) 
+      camera.moveForward(5*duration);
+    if(keys[KeyType.DOWN]) 
+      camera.moveBackwards(5*duration);
+    if(keys[KeyType.LEFT]) 
+      camera.yaw(60*duration);
+    if(keys[KeyType.RIGHT]) 
+      camera.yaw(-60*duration);
+    camera.updateViewMatrix();
+
+    pyramid2.rotate(90*duration, [0,1,0]);
+    pyramid2.translate([0,speed*duration,0]);
+    pyramid2.scale([1+speed*duration, 1, 1]);
   }
   lastTime = now;
 }
@@ -359,9 +226,10 @@ function animar(){
 // carregado!)
 document.addEventListener("DOMContentLoaded", function(e){
   // Primeiro passo: canvas, contexto e shaders
-  iniciarWebGL();
-  // Segundo passo: posições, cores, buffers, matrizes e uniforms
-  criarCena();
-  // Terceiro passo: desenhar e já agendar o próximo redesenho
-  tick();
+  iniciarWebGL().then(function(){
+    // Segundo passo: posições, cores, buffers, matrizes e uniforms
+    criarCena();
+    // Terceiro passo: desenhar e já agendar o próximo redesenho
+    tick();
+  });
 });
