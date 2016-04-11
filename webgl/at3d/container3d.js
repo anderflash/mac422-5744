@@ -24,27 +24,20 @@
  * tica, da Universidade de São Paulo
  */
 
+
 /**
- * @brief Classe para estruturar a cena
+ * @brief Classe para o grafo de cena
+ * 
+ * Organizar uma hierarquia de objetos da cena.
+ *
+ * @class
  */
- class Scene extends Container3D{
+class Container3D extends Object3D{
   constructor(){
-    
+    super();
+    this.objects = [];
   }
-  createObjectByFile(filename){
-    var scene = this;
-    return readOBJ(filename).then(function(data){
-      scene.uploadData(data);
-    });
-  }
-  uploadData(data){
-    this.materials = data[0];
-    this.objects   = data[1];
-    var object_buffer = null;
-    for(let object of this.objects){
-      object_buffer = new Object3DBuffer(this.gl);
-      object_buffer.upload(object);
-      this.objectBuffers.push(object_buffer);
-    }
+  addObject(object){
+    this.objects.push(object);
   }
 }

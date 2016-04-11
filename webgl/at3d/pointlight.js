@@ -23,39 +23,16 @@
  * no dia 05/04/2016 e no dia 08/04/2016, no Instituto de Matemática e Estatís-
  * tica, da Universidade de São Paulo
  */
- 
-/**
- * @brief Get a response assynchronously (JSON, XML, File...).
- * 
- * 
- * @method     get
- * @param      {<type>}  url     { description }
- * @return     {<type>}  { description_of_the_return_value }
- */
-function get(url){
-  return new Promise(function(resolve, reject){
-    var req = new XMLHttpRequest();
-    req.open('GET', url);
-    req.onload = function(){
-      if(req.status == 200){
-        resolve(req.response);
-      }else{
-        reject(Error(req.statusText));
-      }
-    };
-    req.onerror = function(){
-      reject(Error("Network Error"));
-    };
-    req.send();
-  });
-}
+
 
 /**
- * @brief Helper para exibir um dado erro
+ * @brief Luz pontual (ex: lâmpada)
  *
- * @method     logError
- * @param      {Function}  error   { descrição do erro }
+ * @class
  */
-function logError(error){
-  console.error("Failed!", error);
+class PointLight extends Light{
+  constructor(){
+    super();
+    this.position      = null;
+  }
 }

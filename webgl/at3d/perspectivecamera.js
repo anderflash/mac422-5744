@@ -24,67 +24,33 @@
  * tica, da Universidade de São Paulo
  */
 
+
 /**
- * @brief Classe representando uma câmera.
- * 
- * Uma câmera é responsável por manipular a matriz de visualização (viewMatrix)
- * e uma matriz de        
+ * @brief Câmera com projeção perspectiva
+ *
+ * @class
  */
-class Camera{
-  constructor(gl){
-    this.gl                 = gl;
-    this.right              = null;
-    this.up                 = null;
-    this.front              = null;
-    this.origin             = null;
-    this.viewMatrix         = eye();
-    this.projectionMatrix   = eye();
-    this.reset();
+class PerspectiveCamera extends Camera{
+  constructor(){
+    super();
+    this.fov    = null;
+    this.aspect = null;
+    this.near   = null;
+    this.far    = null;
   }
-  reset(){
-    this.resetOrientation();
-    this.resetPosition();
-  }
-  resetOrientation(){
-    this.right              = [ 1, 0, 0];
-    this.up                 = [ 0, 1, 0];
-    this.front              = [ 0, 0,-1];
-  }
-  resetPosition(){
-    this.origin             = [ 0, 0, 0];
-  }
-  upload(){
+  makePerspective(fov, aspect, near, far){
+    this.fov    = fov;
+    this.aspect = aspect;
+    this.near   = near;
+    this.far    = far;
 
-  }
-  roll(units){
-
-  }
-  yaw(units){
-
-  }
-  pitch(units){
-
-  }
-  forward(units){
-
-  }
-  backwards(units){
-
-  }
-  lookAt(target, up){
-
-  }
-  setOrigin(position){
-    this.origin = position;
-  }
-  perspective(fov, aspect, near, far){
-    var zoom = 1;
+    var zoom     = 1;
     var new_fov  = radToDeg(2 * Math.atan(Math.tan(degToRad(fov) * 0.5)/zoom));
     var ymax     = near * Math.tan(degToRad(new_fov * 0.5));
     var ymin     = - ymax;
     var xmin     = ymin * aspect;
     var xmax     = ymax * aspect;
-    this.frustrum(xmin, xmax, ymin, ymax, near, far);
+    return this.frustrum(xmin, xmax, ymin, ymax, near, far);
   }
   frustrum(left, right, bottom, top, near, far){
     var te = this.projectionMatrix;
@@ -100,29 +66,6 @@ class Camera{
     te[ 1 ] = 0;  te[ 5 ] = y;  te[ 9 ] = b;  te[ 13 ] = 0;
     te[ 2 ] = 0;  te[ 6 ] = 0;  te[ 10 ] = c; te[ 14 ] = d;
     te[ 3 ] = 0;  te[ 7 ] = 0;  te[ 11 ] = - 1; te[ 15 ] = 0;
-  }
-  orthographic(left, right, top, bottom, near, far){
-    var te = this.projectionMatrix;
-    var w = 1.0 / ( right - left );
-    var h = 1.0 / ( top - bottom );
-    var p = 1.0 / ( far - near );
-
-    var x = ( right + left ) * w;
-    var y = ( top + bottom ) * h;
-    var z = ( far + near ) * p;
-
-    te[ 0 ] = 2 * w;  te[ 4 ] = 0;  te[ 8 ] = 0;  te[ 12 ] = - x;
-    te[ 1 ] = 0;  te[ 5 ] = 2 * h;  te[ 9 ] = 0;  te[ 13 ] = - y;
-    te[ 2 ] = 0;  te[ 6 ] = 0;  te[ 10 ] = - 2 * p; te[ 14 ] = - z;
-    te[ 3 ] = 0;  te[ 7 ] = 0;  te[ 11 ] = 0; te[ 15 ] = 1;
-
-  }
-  updateViewMatrix(){
-    var r = this.right;
-    var u = this.up;
-    var f = this.forward;
-    this.viewMatrix = [r[0],r[1],r[2],
-                       u[0],u[1],u[2],
-                       f[0],f[1],f[2]];
+    return te;
   }
 }
