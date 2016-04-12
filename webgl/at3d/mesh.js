@@ -33,6 +33,13 @@
 class Mesh extends Object3D{
   constructor(){
     super();
+    // Unpacked version
+    this.verticesU = [];
+    this.normalsU  = [];
+    this.colorsU   = [];
+    this.positionU = [];
+
+    // Packed version
     this.vertices = [];
     this.normals  = [];
     this.colors   = [];
@@ -71,5 +78,38 @@ class Mesh extends Object3D{
     m[11]  = 1;
     // A origem será a posição do objeto
     m[12]  = p[0]; m[13] = p[1]; m[14] = p[2] ; m[15] = 1;
+  }
+  /**
+   * Converter tupla de 3 índices em índice único
+   *
+   * @method     pack_indices
+   */
+  pack_indices(){
+    this.vertices  = [];
+    this.indices   = [];
+    this.normals   = [];
+    this.texcoords = [];
+
+    var object      = {};
+    var vertex_str;
+    var index = 0;
+    for(let face of this.indicesU){
+      for(let vertex of face){
+        vertex_str = vertex.join('/');
+        if(object.hasOwnProperty(vertex_str)){
+          indices.push(object[vertex_str]);
+        }else{
+          object[vertex_str] = index;
+          indices.push(index);
+          if(!isNaN(vertex[0])) vertices.push (this.verticesU[vertex[0]]);
+          if(!isNaN(vertex[1])) normals.push  (this.normalsU[vertex[1]]);
+          if(!isNaN(vertex[2])) texcoords.push(this.texcoordsU[vertex[2]]);
+          index++;
+        }
+      }
+    }
+
+    this.changed   = true;
+    this.dispatchEvent(new Event("changed"));
   }
 }

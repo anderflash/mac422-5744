@@ -5,6 +5,7 @@ light.js
 pointlight.js
 directionallight.js
 object3d.js
+material.js
 mesh.js
 container3d.js
 scene.js
